@@ -302,14 +302,14 @@ local function createCategorizedGUI()
     gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     gui.Parent = PlayerGui
     
-    -- BOUTON RÉOUVERTURE
+    -- BOUTON RÉOUVERTURE (Modifié: fond noir + bordure bleue + texte blanc)
     local reopenBtn = Instance.new("TextButton")
     reopenBtn.Name = "ReopenButton"
     reopenBtn.Size = UDim2.new(0, 50, 0, 50)
     reopenBtn.Position = UDim2.new(1, -60, 0, 10)
-    reopenBtn.BackgroundColor3 = CONFIG.THEME.Accent
+    reopenBtn.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
     reopenBtn.Text = "4x"
-    reopenBtn.TextColor3 = CONFIG.THEME.Background
+    reopenBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     reopenBtn.Font = Enum.Font.GothamBold
     reopenBtn.TextSize = 22
     reopenBtn.Visible = false
@@ -317,6 +317,45 @@ local function createCategorizedGUI()
     
     local reopenCorner = Instance.new("UICorner", reopenBtn)
     reopenCorner.CornerRadius = UDim.new(0, 8)
+    
+    local reopenStroke = Instance.new("UIStroke", reopenBtn)
+    reopenStroke.Color = Color3.fromRGB(0, 80, 180)
+    reopenStroke.Thickness = 3
+    
+    -- DRAG SYSTEM POUR LE BOUTON RÉOUVERTURE
+    local reopenDragging, reopenDragInput, reopenDragStart, reopenStartPos
+    
+    reopenBtn.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            reopenDragging = true
+            reopenDragStart = input.Position
+            reopenStartPos = reopenBtn.Position
+            
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    reopenDragging = false
+                end
+            end)
+        end
+    end)
+    
+    reopenBtn.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement then
+            reopenDragInput = input
+        end
+    end)
+    
+    UserInputService.InputChanged:Connect(function(input)
+        if input == reopenDragInput and reopenDragging then
+            local delta = input.Position - reopenDragStart
+            reopenBtn.Position = UDim2.new(
+                reopenStartPos.X.Scale,
+                reopenStartPos.X.Offset + delta.X,
+                reopenStartPos.Y.Scale,
+                reopenStartPos.Y.Offset + delta.Y
+            )
+        end
+    end)
     
     -- CONTAINER PRINCIPAL
     local mainFrame = Instance.new("Frame")
@@ -332,8 +371,8 @@ local function createCategorizedGUI()
     mainCorner.CornerRadius = UDim.new(0, 12)
     
     local mainStroke = Instance.new("UIStroke", mainFrame)
-    mainStroke.Color = CONFIG.THEME.TextDim
-    mainStroke.Thickness = 1
+    mainStroke.Color = Color3.fromRGB(0, 80, 180)
+    mainStroke.Thickness = 2
     
     -- HEADER
     local header = Instance.new("Frame", mainFrame)
@@ -341,6 +380,11 @@ local function createCategorizedGUI()
     header.Size = UDim2.new(1, 0, 0, 60)
     header.BackgroundColor3 = CONFIG.THEME.Background
     header.BorderSizePixel = 0
+    
+    local headerStroke = Instance.new("UIStroke", header)
+    headerStroke.Color = Color3.fromRGB(0, 80, 180)
+    headerStroke.Thickness = 2
+    headerStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
     
     local logo = Instance.new("TextLabel", header)
     logo.Size = UDim2.new(1, -60, 1, 0)
