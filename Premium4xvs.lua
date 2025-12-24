@@ -1,5 +1,5 @@
 -- ============================================================
--- 4xvs - INTERFACE MINIMALISTE
+-- 4xvs - INTERFACE AVEC CATÉGORIES
 -- ============================================================
 
 local Players = game:GetService("Players")
@@ -44,6 +44,8 @@ local State = {
     espEnabled = false,
     espBoxes = {},
     espConnections = {},
+    optimizerEnabled = false,
+    currentCategory = "Misc",
 }
 
 -- ============================================================
@@ -114,6 +116,24 @@ local function teleportSequence()
 end
 
 -- ============================================================
+-- OPTIMIZER
+-- ============================================================
+local function toggleOptimizer(enabled)
+    if enabled then
+        settings().Rendering.QualityLevel = 1
+        for _, obj in pairs(workspace:GetDescendants()) do
+            if obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Smoke") or obj:IsA("Fire") or obj:IsA("Sparkles") then
+                obj.Enabled = false
+            end
+        end
+        return true, "Optimizer activé"
+    else
+        settings().Rendering.QualityLevel = Enum.QualityLevel.Automatic
+        return true, "Optimizer désactivé"
+    end
+end
+
+-- ============================================================
 -- WALLHACK
 -- ============================================================
 local function clearWallhack()
@@ -168,13 +188,12 @@ local function toggleWallhack(enabled)
 end
 
 -- ============================================================
--- ESP ARC-EN-CIEL
+-- ESP
 -- ============================================================
 local function clearESP()
     for _, data in pairs(State.espBoxes) do
         if data.Box then data.Box:Destroy() end
         if data.NameLabel then data.NameLabel:Destroy() end
-        if data.Connection then data.Connection:Disconnect() end
     end
     State.espBoxes = {}
     
@@ -214,27 +233,16 @@ local function createRainbowESP(player)
     nameLabel.Size = UDim2.new(1, 0, 1, 0)
     nameLabel.BackgroundTransparency = 1
     nameLabel.Text = player.Name
-    nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    nameLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
     nameLabel.Font = Enum.Font.GothamBold
     nameLabel.TextSize = 18
     nameLabel.TextStrokeTransparency = 0
     nameLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
     nameLabel.Parent = billboardGui
     
-    local hue = math.random(0, 360)
-    local rainbowConnection = RunService.Heartbeat:Connect(function()
-        if State.espEnabled and box.Parent then
-            hue = (hue + 3) % 360
-            local color = Color3.fromHSV(hue / 360, 1, 1)
-            box.Color3 = color
-            nameLabel.TextColor3 = color
-        end
-    end)
-    
     State.espBoxes[player.UserId] = {
         Box = box,
         NameLabel = billboardGui,
-        Connection = rainbowConnection
     }
     
     local humanoid = char:FindFirstChild("Humanoid")
@@ -243,7 +251,6 @@ local function createRainbowESP(player)
             if State.espBoxes[player.UserId] then
                 if State.espBoxes[player.UserId].Box then State.espBoxes[player.UserId].Box:Destroy() end
                 if State.espBoxes[player.UserId].NameLabel then State.espBoxes[player.UserId].NameLabel:Destroy() end
-                if State.espBoxes[player.UserId].Connection then State.espBoxes[player.UserId].Connection:Disconnect() end
                 State.espBoxes[player.UserId] = nil
             end
         end)
@@ -283,9 +290,9 @@ local function toggleESP(enabled)
 end
 
 -- ============================================================
--- INTERFACE MINIMALISTE
+-- INTERFACE AVEC CATÉGORIES
 -- ============================================================
-local function createMinimalGUI()
+local function createCategorizedGUI()
     local existing = PlayerGui:FindFirstChild("MinimalTP_GUI")
     if existing then existing:Destroy() end
     
@@ -295,7 +302,7 @@ local function createMinimalGUI()
     gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     gui.Parent = PlayerGui
     
-    -- BOUTON JAUNE POUR ROUVRIR
+    -- BOUTON RÉOUVERTURE
     local reopenBtn = Instance.new("TextButton")
     reopenBtn.Name = "ReopenButton"
     reopenBtn.Size = UDim2.new(0, 50, 0, 50)
@@ -311,11 +318,11 @@ local function createMinimalGUI()
     local reopenCorner = Instance.new("UICorner", reopenBtn)
     reopenCorner.CornerRadius = UDim.new(0, 8)
     
-    -- CONTAINER PRINCIPAL - FOND NOIR
+    -- CONTAINER PRINCIPAL
     local mainFrame = Instance.new("Frame")
     mainFrame.Name = "MainFrame"
-    mainFrame.Size = UDim2.new(0, 320, 0, 400)
-    mainFrame.Position = UDim2.new(0.5, -160, 0.5, -200)
+    mainFrame.Size = UDim2.new(0, 380, 0, 520)
+    mainFrame.Position = UDim2.new(0.5, -190, 0.5, -260)
     mainFrame.BackgroundColor3 = CONFIG.THEME.Background
     mainFrame.BorderSizePixel = 0
     mainFrame.Active = true
@@ -335,7 +342,6 @@ local function createMinimalGUI()
     header.BackgroundColor3 = CONFIG.THEME.Background
     header.BorderSizePixel = 0
     
-    -- Logo "4xvs"
     local logo = Instance.new("TextLabel", header)
     logo.Size = UDim2.new(1, -60, 1, 0)
     logo.Position = UDim2.new(0, 20, 0, 0)
@@ -346,7 +352,6 @@ local function createMinimalGUI()
     logo.TextSize = 32
     logo.TextXAlignment = Enum.TextXAlignment.Left
     
-    -- Bouton fermer
     local closeBtn = Instance.new("TextButton", header)
     closeBtn.Size = UDim2.new(0, 35, 0, 35)
     closeBtn.Position = UDim2.new(1, -45, 0, 12)
@@ -373,49 +378,103 @@ local function createMinimalGUI()
         reopenBtn.Visible = false
     end)
     
-    closeBtn.MouseEnter:Connect(function()
-        tween(closeBtn, {BackgroundTransparency = 0.5}, 0.2)
-    end)
+    -- TABS CONTAINER
+    local tabsContainer = Instance.new("Frame", mainFrame)
+    tabsContainer.Name = "TabsContainer"
+    tabsContainer.Size = UDim2.new(1, -20, 0, 50)
+    tabsContainer.Position = UDim2.new(0, 10, 0, 70)
+    tabsContainer.BackgroundTransparency = 1
     
-    closeBtn.MouseLeave:Connect(function()
-        tween(closeBtn, {BackgroundTransparency = 0.8}, 0.2)
-    end)
+    local tabsLayout = Instance.new("UIListLayout", tabsContainer)
+    tabsLayout.FillDirection = Enum.FillDirection.Horizontal
+    tabsLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+    tabsLayout.Padding = UDim.new(0, 8)
     
-    -- CONTENT
-    local content = Instance.new("Frame", mainFrame)
-    content.Name = "Content"
-    content.Size = UDim2.new(1, -30, 1, -75)
-    content.Position = UDim2.new(0, 15, 0, 65)
-    content.BackgroundTransparency = 1
+    -- CONTENT CONTAINER
+    local contentFrame = Instance.new("Frame", mainFrame)
+    contentFrame.Name = "ContentFrame"
+    contentFrame.Size = UDim2.new(1, -30, 1, -180)
+    contentFrame.Position = UDim2.new(0, 15, 0, 130)
+    contentFrame.BackgroundTransparency = 1
+    contentFrame.ClipsDescendants = true
     
-    -- STATUS
-    local statusLabel = Instance.new("TextLabel", content)
-    statusLabel.Name = "StatusLabel"
-    statusLabel.Size = UDim2.new(1, 0, 0, 25)
-    statusLabel.BackgroundTransparency = 1
-    statusLabel.Text = "Prêt"
-    statusLabel.TextColor3 = CONFIG.THEME.Success
-    statusLabel.Font = Enum.Font.Gotham
-    statusLabel.TextSize = 14
-    statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+    -- FOOTER (by 8v & 4b)
+    local footer = Instance.new("TextLabel", mainFrame)
+    footer.Name = "Footer"
+    footer.Size = UDim2.new(1, 0, 0, 30)
+    footer.Position = UDim2.new(0, 0, 1, -35)
+    footer.BackgroundTransparency = 1
+    footer.Text = "by 8v & 4b"
+    footer.TextColor3 = CONFIG.THEME.TextDim
+    footer.Font = Enum.Font.Gotham
+    footer.TextSize = 12
+    footer.TextXAlignment = Enum.TextXAlignment.Center
     
-    local tpCountLabel = Instance.new("TextLabel", content)
-    tpCountLabel.Name = "TPCount"
-    tpCountLabel.Size = UDim2.new(1, 0, 0, 20)
-    tpCountLabel.Position = UDim2.new(0, 0, 0, 25)
-    tpCountLabel.BackgroundTransparency = 1
-    tpCountLabel.Text = "TP: 0"
-    tpCountLabel.TextColor3 = CONFIG.THEME.TextDim
-    tpCountLabel.Font = Enum.Font.Gotham
-    tpCountLabel.TextSize = 12
-    tpCountLabel.TextXAlignment = Enum.TextXAlignment.Left
+    -- FONCTION POUR CRÉER UN TAB
+    local tabs = {}
+    local function createTab(name)
+        local tabBtn = Instance.new("TextButton", tabsContainer)
+        tabBtn.Name = name .. "Tab"
+        tabBtn.Size = UDim2.new(0, 80, 1, 0)
+        tabBtn.BackgroundColor3 = CONFIG.THEME.TextDim
+        tabBtn.BackgroundTransparency = 0.9
+        tabBtn.Text = name
+        tabBtn.TextColor3 = CONFIG.THEME.TextDim
+        tabBtn.Font = Enum.Font.GothamBold
+        tabBtn.TextSize = 14
+        tabBtn.AutoButtonColor = false
+        
+        local tabCorner = Instance.new("UICorner", tabBtn)
+        tabCorner.CornerRadius = UDim.new(0, 8)
+        
+        local contentContainer = Instance.new("Frame", contentFrame)
+        contentContainer.Name = name .. "Content"
+        contentContainer.Size = UDim2.new(1, 0, 1, 0)
+        contentContainer.BackgroundTransparency = 1
+        contentContainer.Visible = false
+        
+        local contentLayout = Instance.new("UIListLayout", contentContainer)
+        contentLayout.FillDirection = Enum.FillDirection.Vertical
+        contentLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+        contentLayout.Padding = UDim.new(0, 10)
+        
+        tabs[name] = {
+            Button = tabBtn,
+            Content = contentContainer
+        }
+        
+        tabBtn.MouseButton1Click:Connect(function()
+            for tabName, tabData in pairs(tabs) do
+                tabData.Content.Visible = false
+                tabData.Button.BackgroundTransparency = 0.9
+                tabData.Button.TextColor3 = CONFIG.THEME.TextDim
+            end
+            
+            contentContainer.Visible = true
+            tabBtn.BackgroundTransparency = 0.5
+            tabBtn.TextColor3 = CONFIG.THEME.Accent
+            State.currentCategory = name
+        end)
+        
+        return contentContainer
+    end
+    
+    -- CRÉER LES TABS
+    local miscContent = createTab("Misc")
+    local espContent = createTab("ESP")
+    local keyContent = createTab("Key")
+    local infoContent = createTab("Info")
+    
+    -- ACTIVER MISC PAR DÉFAUT
+    tabs["Misc"].Content.Visible = true
+    tabs["Misc"].Button.BackgroundTransparency = 0.5
+    tabs["Misc"].Button.TextColor3 = CONFIG.THEME.Accent
     
     -- FONCTION POUR CRÉER UN BOUTON
-    local function createButton(name, yPos)
-        local btn = Instance.new("TextButton", content)
+    local function createButton(parent, name, callback)
+        local btn = Instance.new("TextButton", parent)
         btn.Name = name .. "Btn"
         btn.Size = UDim2.new(1, 0, 0, 50)
-        btn.Position = UDim2.new(0, 0, 0, yPos)
         btn.BackgroundColor3 = CONFIG.THEME.TextDim
         btn.BackgroundTransparency = 0.9
         btn.Text = name
@@ -449,85 +508,107 @@ local function createMinimalGUI()
             tween(btn, {BackgroundTransparency = 0.9}, 0.2)
         end)
         
+        if callback then
+            btn.MouseButton1Click:Connect(function()
+                callback(btn, statusIcon)
+            end)
+        end
+        
         return btn, statusIcon
     end
     
-    -- BOUTON TÉLÉPORTATION
-    local tpBtn, tpIcon = createButton("Téléporter", 60)
+    -- FONCTION POUR CRÉER UN LABEL
+    local function createLabel(parent, text, color)
+        local label = Instance.new("TextLabel", parent)
+        label.Size = UDim2.new(1, 0, 0, 30)
+        label.BackgroundTransparency = 1
+        label.Text = text
+        label.TextColor3 = color or CONFIG.THEME.Text
+        label.Font = Enum.Font.Gotham
+        label.TextSize = 14
+        label.TextXAlignment = Enum.TextXAlignment.Left
+        label.TextWrapped = true
+        return label
+    end
     
-    tpBtn.MouseButton1Click:Connect(function()
+    -- MISC TAB
+    createButton(miscContent, "Téléporter", function(btn, icon)
         local success, msg = teleportSequence()
-        statusLabel.Text = msg
-        statusLabel.TextColor3 = success and CONFIG.THEME.Success or CONFIG.THEME.Error
-        tpCountLabel.Text = "TP: " .. State.totalTeleports
-        
         if success then
-            tpIcon.Text = "✓"
-            tpIcon.TextColor3 = CONFIG.THEME.Success
+            icon.Text = "✓"
+            icon.TextColor3 = CONFIG.THEME.Success
             task.wait(1)
-            tpIcon.Text = "○"
-            tpIcon.TextColor3 = CONFIG.THEME.TextDim
+            icon.Text = "○"
+            icon.TextColor3 = CONFIG.THEME.TextDim
         end
     end)
     
-    -- BOUTON WALLHACK
-    local whBtn, whIcon = createButton("Wallhack", 120)
-    
-    whBtn.MouseButton1Click:Connect(function()
-        State.wallhackEnabled = not State.wallhackEnabled
-        toggleWallhack(State.wallhackEnabled)
+    createButton(miscContent, "Optimizer", function(btn, icon)
+        State.optimizerEnabled = not State.optimizerEnabled
+        local success, msg = toggleOptimizer(State.optimizerEnabled)
         
-        if State.wallhackEnabled then
-            whIcon.Text = "●"
-            whIcon.TextColor3 = CONFIG.THEME.Success
-            statusLabel.Text = "Wallhack activé"
-            statusLabel.TextColor3 = CONFIG.THEME.Success
+        if State.optimizerEnabled then
+            icon.Text = "●"
+            icon.TextColor3 = CONFIG.THEME.Accent
         else
-            whIcon.Text = "○"
-            whIcon.TextColor3 = CONFIG.THEME.TextDim
-            statusLabel.Text = "Wallhack désactivé"
-            statusLabel.TextColor3 = CONFIG.THEME.TextDim
+            icon.Text = "○"
+            icon.TextColor3 = CONFIG.THEME.TextDim
         end
     end)
     
-    -- BOUTON ESP
-    local espBtn, espIcon = createButton("ESP", 180)
-    
-    espBtn.MouseButton1Click:Connect(function()
+    -- ESP TAB
+    createButton(espContent, "ESP", function(btn, icon)
         State.espEnabled = not State.espEnabled
         toggleESP(State.espEnabled)
         
         if State.espEnabled then
-            espIcon.Text = "●"
-            espIcon.TextColor3 = CONFIG.THEME.Success
-            statusLabel.Text = "ESP activé"
-            statusLabel.TextColor3 = CONFIG.THEME.Success
+            icon.Text = "●"
+            icon.TextColor3 = CONFIG.THEME.Success
         else
-            espIcon.Text = "○"
-            espIcon.TextColor3 = CONFIG.THEME.TextDim
-            statusLabel.Text = "ESP désactivé"
-            statusLabel.TextColor3 = CONFIG.THEME.TextDim
+            icon.Text = "○"
+            icon.TextColor3 = CONFIG.THEME.TextDim
         end
     end)
     
-    -- RACCOURCIS CLAVIER
-    UserInputService.InputBegan:Connect(function(input, gameProcessed)
-        if gameProcessed then return end
+    createButton(espContent, "Wallhack", function(btn, icon)
+        State.wallhackEnabled = not State.wallhackEnabled
+        toggleWallhack(State.wallhackEnabled)
         
-        -- T pour téléporter
-        if input.KeyCode == Enum.KeyCode.T then
-            local success, msg = teleportSequence()
-            statusLabel.Text = msg
-            statusLabel.TextColor3 = success and CONFIG.THEME.Success or CONFIG.THEME.Error
-            tpCountLabel.Text = "TP: " .. State.totalTeleports
+        if State.wallhackEnabled then
+            icon.Text = "●"
+            icon.TextColor3 = CONFIG.THEME.Success
+        else
+            icon.Text = "○"
+            icon.TextColor3 = CONFIG.THEME.TextDim
         end
-        
-        -- INSERT pour ouvrir/fermer
-        if input.KeyCode == Enum.KeyCode.Insert then
-            State.guiVisible = not State.guiVisible
-            mainFrame.Visible = State.guiVisible
-            reopenBtn.Visible = not State.guiVisible
-        end
+    end)
+    
+    -- KEY TAB
+    createLabel(keyContent, "Raccourcis clavier:", CONFIG.THEME.Accent)
+    createLabel(keyContent, "[T] - Téléporter", CONFIG.THEME.Text)
+    createLabel(keyContent, "[INSERT] - Ouvrir/Fermer", CONFIG.THEME.Text)
+    
+    -- INFO TAB
+    createLabel(infoContent, "Discord:", CONFIG.THEME.Accent)
+    
+    local discordBtn = Instance.new("TextButton", infoContent)
+    discordBtn.Size = UDim2.new(1, 0, 0, 50)
+    discordBtn.BackgroundColor3 = CONFIG.THEME.TextDim
+    discordBtn.BackgroundTransparency = 0.9
+    discordBtn.Text = "discord.gg/TVBtZ47K"
+    discordBtn.TextColor3 = CONFIG.THEME.Accent
+    discordBtn.Font = Enum.Font.GothamBold
+    discordBtn.TextSize = 14
+    discordBtn.AutoButtonColor = false
+    
+    local discordCorner = Instance.new("UICorner", discordBtn)
+    discordCorner.CornerRadius = UDim.new(0, 8)
+    
+    discordBtn.MouseButton1Click:Connect(function()
+        setclipboard("https://discord.gg/TVBtZ47K")
+        discordBtn.Text = "Copié!"
+        task.wait(2)
+        discordBtn.Text = "discord.gg/TVBtZ47K"
     end)
     
     -- DRAG SYSTEM
@@ -565,10 +646,25 @@ local function createMinimalGUI()
         end
     end)
     
+    -- RACCOURCIS CLAVIER
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        
+        if input.KeyCode == Enum.KeyCode.T then
+            teleportSequence()
+        end
+        
+        if input.KeyCode == Enum.KeyCode.Insert then
+            State.guiVisible = not State.guiVisible
+            mainFrame.Visible = State.guiVisible
+            reopenBtn.Visible = not State.guiVisible
+        end
+    end)
+    
     print("═══════════════════════════════════")
-    print("  4xvs - Interface minimaliste")
-    print("  [T] = Téléporter")
-    print("  [INSERT] = Ouvrir/Fermer")
+    print("  4xvs - Interface avec catégories")
+    print("  by 8v")
+    print("  Discord: discord.gg/TVBtZ47K")
     print("═══════════════════════════════════")
 end
 
@@ -584,4 +680,4 @@ LocalPlayer.CharacterAdded:Connect(function(character)
     task.wait(1)
 end)
 
-createMinimalGUI()
+createCategorizedGUI()
